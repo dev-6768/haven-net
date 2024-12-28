@@ -1,97 +1,139 @@
+import 'dart:async';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:speech_to_text/speech_to_text.dart' as stt;
+import 'package:flutter/services.dart';
+import 'package:background_fetch/background_fetch.dart';
+import 'package:haven_net/features/first_screen/view/first_screen.dart';
+import 'package:haven_net/features/local_notification/controller/local_notification_controller.dart';
+import 'package:haven_net/features/voice_recognition/view/voice_recognition_page.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
-void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MyApp());
+// [Android-only] This "Headless Task" is run when the Android app is terminated with `enableHeadless: true`
+// Be sure to annotate your callback function to avoid issues in release mode on Flutter >= 3.3.0
+
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+@pragma('vm:entry-point')
+void backgroundFetchHeadlessTask(HeadlessTask task) async {
+  String taskId = task.taskId;
+  bool isTimeout = task.timeout;
+  if (isTimeout) {
+    // This task has exceeded its allowed running-time.  
+    // You must stop what you're doing and immediately .finish(taskId)
+    print("[BackgroundFetch] Headless task timed-out: $taskId");
+    BackgroundFetch.finish(taskId);
+    return;
+  }  
+  print('[BackgroundFetch] Headless event received.');
+  
+  print("Hello i am speaking from background!!");
+  BackgroundFetch.finish(taskId);
 }
 
-class MyApp extends StatelessWidget {
+void main() async {
+  // Enable integration testing with the Flutter Driver extension.
+  // See https://flutter.io/testing/ for more info.
+
+  WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  FirebaseApiInterface().initNotifications();
+  runApp(const MyApp());
+
+  // Register to receive BackgroundFetch events after app is terminated.
+  // Requires {stopOnTerminate: false, enableHeadless: true}
+  BackgroundFetch.registerHeadlessTask(backgroundFetchHeadlessTask);
+}
+
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
   @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Haven Net',
-      home: SpeechScreen(),
-    );
-  }
+  _MyAppState createState() => new _MyAppState();
 }
 
-class SpeechScreen extends StatefulWidget {
-  @override
-  _SpeechScreenState createState() => _SpeechScreenState();
-}
-
-class _SpeechScreenState extends State<SpeechScreen> {
-  late stt.SpeechToText _speech;
-  bool _isListening = false;
-  String _text = "Press the button and start speaking.";
-  double _confidence = 1.0;
+class _MyAppState extends State<MyApp> {
+  bool _enabled = true;
+  int _status = 0;
+  List<DateTime> _events = [];
 
   @override
   void initState() {
     super.initState();
-    _speech = stt.SpeechToText();
+    initPlatformState();
   }
 
-  Future<void> _listen() async {
-    if (!_isListening) {
-      bool available = await _speech.initialize(
-        onStatus: (val) => print('onStatus: $val'),
-        onError: (val) => print('onError: $val'),
-      );
-      if (available) {
-        setState(() => _isListening = true);
-        _speech.listen(
-          onResult: (val) => setState(() {
-            _text = val.recognizedWords;
-            if (val.hasConfidenceRating && val.confidence > 0) {
-              _confidence = val.confidence;
-            }
-          }),
-        );
-      }
+  // Platform messages are asynchronous, so we initialize in an async method.
+  Future<void> initPlatformState() async {
+    // Configure BackgroundFetch.
+    print("Firebase Token : ${await FirebaseMessaging.instance.getToken()}");
+    int status = await BackgroundFetch.configure(BackgroundFetchConfig(
+        minimumFetchInterval: 15,
+        stopOnTerminate: false,
+        enableHeadless: true,
+        requiresBatteryNotLow: false,
+        requiresCharging: false,
+        requiresStorageNotLow: false,
+        requiresDeviceIdle: false,
+        requiredNetworkType: NetworkType.NONE
+    ), (String taskId) async {  // <-- Event handler
+      // This is the fetch-event callback.
+      print("[BackgroundFetch] Event received $taskId");
+      setState(() {
+        _events.insert(0, DateTime.now());
+      });
+      print(_events);
+      // IMPORTANT:  You must signal completion of your task or the OS can punish your app
+      // for taking too long in the background.
+      BackgroundFetch.finish(taskId);
+    }, (String taskId) async {  // <-- Task timeout handler.
+      // This task has exceeded its allowed running-time.  You must stop what you're doing and immediately .finish(taskId)
+      print("[BackgroundFetch] TASK TIMEOUT taskId: $taskId");
+      BackgroundFetch.finish(taskId);
+    });
+    print('[BackgroundFetch] configure success: $status');
+    setState(() {
+      _status = status;
+    });        
+
+    // If the widget was removed from the tree while the asynchronous platform
+    // message was in flight, we want to discard the reply rather than calling
+    // setState to update our non-existent appearance.
+    if (!mounted) return;
+  }
+
+  void _onClickEnable(enabled) {
+    setState(() {
+      _enabled = enabled;
+    });
+    if (enabled) {
+      BackgroundFetch.start().then((int status) {
+        print('[BackgroundFetch] start success: $status');
+      }).catchError((e) {
+        print('[BackgroundFetch] start FAILURE: $e');
+      });
     } else {
-      setState(() => _isListening = false);
-      _speech.stop();
+      BackgroundFetch.stop().then((int status) {
+        print('[BackgroundFetch] stop success: $status');
+      });
     }
   }
 
+  void _onClickStatus() async {
+    int status = await BackgroundFetch.status;
+    print('[BackgroundFetch] status: $status');
+    setState(() {
+      _status = status;
+    });
+  }
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Haven Net',
-          style: TextStyle(
-            color: Colors.white,
-          ),
-        ),
-        backgroundColor: Colors.blue,
-      ),
-      body: Column(
-        children: [
-          Text(
-            'Confidence: ${(_confidence * 100.0).toStringAsFixed(1)}%',
-            style: const TextStyle(fontSize: 24.0),
-          ),
-          Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                _text,
-                style: const TextStyle(fontSize: 32.0),
-              ),
-            ),
-          ),
-        ],
-      ),
+    print(_events);
 
-      floatingActionButton: FloatingActionButton(
-        onPressed: _listen,
-        child: Icon(_isListening ? Icons.mic : Icons.mic_none),
-      ),
+    return const MaterialApp(
+      home: FirstScreen(),
     );
   }
 }

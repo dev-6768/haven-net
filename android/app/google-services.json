@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "85705829712",
+    "project_id": "haven-net",
+    "storage_bucket": "haven-net.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:85705829712:android:9ba1638c45737621845055",
+        "android_client_info": {
+          "package_name": "com.example.haven_net"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB_7o-wE0Mh6dfpXDiqYwh45wvVZHXol24"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
