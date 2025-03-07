@@ -1,13 +1,15 @@
 import 'dart:async';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:background_fetch/background_fetch.dart';
 import 'package:haven_net/features/first_screen/view/first_screen.dart';
 import 'package:haven_net/features/local_notification/controller/local_notification_controller.dart';
-import 'package:haven_net/features/voice_recognition/view/voice_recognition_page.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:haven_net/features/parent_home_page/view/parent_home_page.dart';
+import 'package:haven_net/features/voice_recognition/view/voice_recognition_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'firebase_options.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 // [Android-only] This "Headless Task" is run when the Android app is terminated with `enableHeadless: true`
 // Be sure to annotate your callback function to avoid issues in release mode on Flutter >= 3.3.0
@@ -24,7 +26,9 @@ void backgroundFetchHeadlessTask(HeadlessTask task) async {
     print("[BackgroundFetch] Headless task timed-out: $taskId");
     BackgroundFetch.finish(taskId);
     return;
-  }  
+  } 
+
+
   print('[BackgroundFetch] Headless event received.');
   
   print("Hello i am speaking from background!!");
@@ -58,6 +62,12 @@ class _MyAppState extends State<MyApp> {
   bool _enabled = true;
   int _status = 0;
   List<DateTime> _events = [];
+  late stt.SpeechToText _speech;
+  bool _isListening = false;
+  String _text = "Press the button & start speaking";
+  String email = "";
+  String password = "";
+  String userType = "";
 
   @override
   void initState() {
@@ -68,6 +78,8 @@ class _MyAppState extends State<MyApp> {
   // Platform messages are asynchronous, so we initialize in an async method.
   Future<void> initPlatformState() async {
     // Configure BackgroundFetch.
+    await getLoginDataFromSharedPreferences();
+
     print("Firebase Token : ${await FirebaseMessaging.instance.getToken()}");
     int status = await BackgroundFetch.configure(BackgroundFetchConfig(
         minimumFetchInterval: 15,
@@ -80,11 +92,13 @@ class _MyAppState extends State<MyApp> {
         requiredNetworkType: NetworkType.NONE
     ), (String taskId) async {  // <-- Event handler
       // This is the fetch-event callback.
-      print("[BackgroundFetch] Event received $taskId");
+      _speech = stt.SpeechToText();
+      print("I am here [BackgroundFetch] Event received $taskId");
       setState(() {
         _events.insert(0, DateTime.now());
       });
-      print(_events);
+      print("Line 85 events till now : $_events");
+      await _listen();
       // IMPORTANT:  You must signal completion of your task or the OS can punish your app
       // for taking too long in the background.
       BackgroundFetch.finish(taskId);
@@ -102,6 +116,46 @@ class _MyAppState extends State<MyApp> {
     // message was in flight, we want to discard the reply rather than calling
     // setState to update our non-existent appearance.
     if (!mounted) return;
+  }
+
+
+  Future<void> _listen() async {
+    print("In _listen() Function..");
+
+    bool available = await _speech.initialize(
+      onStatus: (status) => print("Status: $status"),
+      onError: (error) => print("Error: $error"),
+    );
+
+    print("executed availability");
+
+    if (available) {
+      print("In available block and listening....");
+      //_isListening = true;
+      //setState(() => _isListening = true);
+      _speech.listen(
+        onResult: (result) {
+          setState(() {
+            _text = result.recognizedWords;
+          });
+        },
+      );
+    }
+
+    else {
+      _speech.stop();
+      print("Engine is not available now");
+    }
+    // if (!_isListening) {
+    //   print("In listening block, checking availability");
+    // } 
+    
+    // else {
+    //   _isListening = false;
+    //   print("stopped listening");
+    //   setState(() => _isListening = false);
+    //   _speech.stop();
+    // }
   }
 
   void _onClickEnable(enabled) {
@@ -128,12 +182,44 @@ class _MyAppState extends State<MyApp> {
       _status = status;
     });
   }
+
+  Future<void> getLoginDataFromSharedPreferences() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    email = prefs.getString('login_email') ?? "";
+    password = prefs.getString('login_password') ?? "";
+    userType = prefs.getString('login_user_type') ?? "";
+  }
+
   @override
   Widget build(BuildContext context) {
     print(_events);
+    print(_text);
 
-    return const MaterialApp(
-      home: FirstScreen(),
-    );
+    if(email != "" && password != "" && userType != "") {
+      if(userType == "child") {
+        return MaterialApp(
+          home: SpeechScreen(
+            eventsList: _events,
+          )
+        );
+        
+        
+      }
+
+      else {
+        return MaterialApp(
+          home: ParentsHomePage(
+            email: email
+          )
+        );
+        
+      }
+    }
+
+    else {
+      return const MaterialApp(
+        home: FirstScreen(),
+      );
+    }
   }
 }

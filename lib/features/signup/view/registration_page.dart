@@ -22,7 +22,7 @@ class _RegistrationFormState extends State<RegistrationForm> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Registration Form"),
+        title: const Text("Child Registration Form"),
       ),
       body: PageView(
         controller: _pageController,

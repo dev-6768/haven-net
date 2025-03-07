@@ -21,7 +21,7 @@ class _ParentRegistrationFormState extends State<ParentRegistrationForm> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Registration Form"),
+        title: const Text("Parent Registration Form"),
       ),
       body: PageView(
         controller: _pageController,
@@ -193,18 +193,26 @@ class _ParentRegistrationFormState extends State<ParentRegistrationForm> {
       });
 
       try {
-        final email = _formData['father_email'];
+        final fatherEmail = _formData['father_email'];
         final password = _formData['password'];
-        final UserCredential userCredential =
+        final UserCredential fatherUserCredential =
           await FirebaseAuth.instance.createUserWithEmailAndPassword(
-            email: email,
+            email: fatherEmail,
             password: password,
+          );
+
+        final motherEmail = _formData['mother_email'];
+        final UserCredential motherUserCredential = 
+          await FirebaseAuth.instance.createUserWithEmailAndPassword(
+            email: motherEmail, 
+            password: password
           );
 
         // Save form data to Firestore
         Map<String, dynamic> firestoreData = {};
         firestoreData.addAll(_formData);
-        firestoreData["user_credential"] = userCredential.user?.uid;
+        firestoreData["father_user_credential"] = fatherUserCredential.user?.uid;
+        firestoreData["mother_user_credential"] = motherUserCredential.user?.uid;
         firestoreData["fcmToken"] = await FirebaseMessaging.instance.getToken();
         firestoreData["user_type"] = "parent";
 
@@ -212,9 +220,16 @@ class _ParentRegistrationFormState extends State<ParentRegistrationForm> {
           "email": _formData["father_email"],
           "token": firestoreData["fcmToken"]
         };
+        
+        Map<String, String> motherFcmTokenData = {
+          "email": _formData["mother_email"],
+          "token": firestoreData["fcmToken"]
+        };
 
         await FirebaseFirestore.instance.collection('registrations').add(firestoreData);
         await FirebaseFirestore.instance.collection('fcmtokens').add(fcmTokenData);
+        await FirebaseFirestore.instance.collection('fcmtokens').add(motherFcmTokenData);
+
         _showSnackbar("Registration successful!");
 
         setState(() {

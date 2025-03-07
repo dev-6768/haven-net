@@ -1,8 +1,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:haven_net/features/parent_home_page/view/parent_home_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ParentLoginPage extends StatefulWidget {
   const ParentLoginPage({super.key});
@@ -14,11 +16,18 @@ class _ParentLoginPageState extends State<ParentLoginPage> {
   final _formKey = GlobalKey<FormBuilderState>();
   bool isLoading = false;
 
+  Future<void> setEmailAndPassword(String email, String password, String userType) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('login_email', email);
+    await prefs.setString('login_password', password);
+    await prefs.setString('login_user_type', userType);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Login"),
+        title: const Text("Parent Login"),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -82,16 +91,37 @@ class _ParentLoginPageState extends State<ParentLoginPage> {
       final email = formData?['email'];
       final password = formData?['password'];
 
+      final changedLoginFcmToken = await FirebaseMessaging.instance.getToken();
+
       try {
         setState(() {
           isLoading = true;
         });
-        final parentUsers = await FirebaseFirestore.instance.collection("registrations").where("father_email", isEqualTo: email).where("password", isEqualTo: password).where("user_type", isEqualTo: "parent").get();
+        final parentUsers = await FirebaseFirestore.instance.collection("registrations").where(Filter.or(
+              Filter("father_email", isEqualTo: email),
+              Filter("mother_email", isEqualTo: email),
+            )).where("password", isEqualTo: password).where("user_type", isEqualTo: "parent").get();
+
         final parentUserList = parentUsers.docs.map((doc) => doc.data()).toList();
         if(parentUserList.isNotEmpty) {
+          await setEmailAndPassword(email, password, "parent");
+
+          await FirebaseFirestore.instance
+            .collection('fcmtokens')
+            .where('email', isEqualTo: email)
+            .get()
+            .then((querySnapshot) {
+              if (querySnapshot.docs.isNotEmpty) {
+                querySnapshot.docs.first.reference.update({
+                  'token': changedLoginFcmToken
+                });
+              }
+            });
+
+
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (context) => const ParentsHomePage()),
+            MaterialPageRoute(builder: (context) => ParentsHomePage(email: email)),
           );
 
           _showSnackbar("Login Successful");

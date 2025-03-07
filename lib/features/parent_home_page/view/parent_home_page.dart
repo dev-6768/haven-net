@@ -1,15 +1,46 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:haven_net/features/first_screen/view/first_screen.dart';
+import 'package:haven_net/features/parent_home_page/view/widget/complaints_list_widget.dart';
+import 'package:haven_net/features/parent_home_page/view/widget/parent_blog_page_widget.dart';
+import 'package:haven_net/features/parent_home_page/view/widget/parents_connect_page.dart';
+import 'package:haven_net/features/parent_home_page/view/widget/tips_and_tricks_widget.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class ParentsHomePage extends StatelessWidget {
-  const ParentsHomePage({super.key});
+class ParentsHomePage extends StatefulWidget {
+  final String email;
+  const ParentsHomePage({super.key, required this.email});
+
+
+  @override
+  State<ParentsHomePage> createState() => _ParentsHomePageState();
+}
+
+class _ParentsHomePageState extends State<ParentsHomePage> {
+  @override
+  void dispose() {
+    super.dispose();
+    FirebaseAuth.instance.signOut();
+  }
+
+  Future<void> logoutParentUser() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('login_email', "");
+    await prefs.setString('login_password', "");
+    await prefs.setString('login_user_type', "");
+
+    Navigator.pop(context);
+    
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const FirstScreen())
+    );
+  }
+
+
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        primarySwatch: Colors.pink,
-      ),
-      home: Scaffold(
+    return Scaffold(
         appBar: AppBar(
           title: const Text(
             'Welcome, Parents!',
@@ -17,32 +48,41 @@ class ParentsHomePage extends StatelessWidget {
           ),
           centerTitle: true,
           backgroundColor: Colors.pink.shade300,
-        ),
-        body: ParentHomePageBody(),
-        bottomNavigationBar: BottomNavigationBar(
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home),
-              label: 'Home',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.favorite),
-              label: 'Favorites',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.settings),
-              label: 'Settings',
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await logoutParentUser();
+              },
+              child: const Text("Logout"),
             ),
           ],
-          selectedItemColor: Colors.pink.shade300,
         ),
-      ),
-    );
+        body: ParentHomePageBody(email: widget.email),
+
+        // bottomNavigationBar: BottomNavigationBar(
+        //   items: const [
+        //     BottomNavigationBarItem(
+        //       icon: Icon(Icons.home),
+        //       label: 'Home',
+        //     ),
+        //     BottomNavigationBarItem(
+        //       icon: Icon(Icons.favorite),
+        //       label: 'Favorites',
+        //     ),
+        //     BottomNavigationBarItem(
+        //       icon: Icon(Icons.settings),
+        //       label: 'Settings',
+        //     ),
+        //   ],
+        //   selectedItemColor: Colors.pink.shade300,
+        // ),
+      );
   }
 }
 
 class ParentHomePageBody extends StatelessWidget {
-  const ParentHomePageBody({super.key});
+  final String email;
+  const ParentHomePageBody({super.key, required this.email});
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -74,17 +114,6 @@ class ParentHomePageBody extends StatelessWidget {
                   textAlign: TextAlign.center,
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
-
-            // Icon Buttons Section
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _iconCard(Icons.family_restroom, 'Family Time'),
-                _iconCard(Icons.child_friendly, 'Child Care'),
-                _iconCard(Icons.school, 'Education'),
-              ],
             ),
             const SizedBox(height: 20),
 
@@ -122,22 +151,60 @@ class ParentHomePageBody extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 ListTile(
+                  leading: Icon(Icons.note, color: Colors.pink.shade300),
+                  title: const Text('View Complaints'),
+                  subtitle: const Text('View your child complaints'),
+                  trailing: IconButton(onPressed: () {
+                    Navigator.push(
+                      context, 
+                      MaterialPageRoute(
+                        builder: (context) {
+                          return ComplaintsPage(parentEmail: email, userType: "parent");
+                        }
+                      )
+                    );
+                  }, icon: const Icon(Icons.arrow_forward_ios)),
+                ),
+
+                ListTile(
                   leading: Icon(Icons.book, color: Colors.pink.shade300),
                   title: const Text('Parenting Guide'),
                   subtitle: const Text('Learn the best practices for parenting.'),
-                  trailing: const Icon(Icons.arrow_forward_ios),
+                  trailing: IconButton(onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => const BlogSearchPage())
+                    );
+                  }, icon: const Icon(Icons.arrow_forward_ios),)
                 ),
+
                 ListTile(
                   leading: Icon(Icons.lightbulb, color: Colors.pink.shade300),
                   title: const Text('Tips & Tricks'),
                   subtitle: const Text('Quick advice for daily challenges.'),
-                  trailing: const Icon(Icons.arrow_forward_ios),
+                  trailing: IconButton(onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TipsAndTricksWidget(email: email)
+                      )
+                    );
+                  }, icon: const Icon(Icons.arrow_forward_ios),)
                 ),
                 ListTile(
                   leading: Icon(Icons.support, color: Colors.pink.shade300),
                   title: const Text('Support Groups'),
                   subtitle: const Text('Connect with other parents.'),
-                  trailing: const Icon(Icons.arrow_forward_ios),
+                  trailing: IconButton(onPressed: () {
+                    Navigator.push(
+                      context, 
+                      MaterialPageRoute(
+                        builder: (context) {
+                          return const ComplaintSearchPage();
+                        }
+                      )
+                    );
+                  }, icon: const Icon(Icons.arrow_forward_ios),)
                 ),
               ],
             ),

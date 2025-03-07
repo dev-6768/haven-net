@@ -3,9 +3,26 @@ import 'package:haven_net/features/login/view/login_page.dart';
 import 'package:haven_net/features/login/view/parent_login.dart';
 import 'package:haven_net/features/signup/view/parent_registration.dart';
 import 'package:haven_net/features/signup/view/registration_page.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-class FirstScreen extends StatelessWidget {
+class FirstScreen extends StatefulWidget {
   const FirstScreen({super.key});
+
+  @override
+  State<FirstScreen> createState() => _FirstScreenState();
+}
+
+class _FirstScreenState extends State<FirstScreen> {
+  @override
+  void initState() {
+    super.initState();
+    requestPermissions();
+  }
+
+  Future<void> requestPermissions() async {
+    await [Permission.location].request();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

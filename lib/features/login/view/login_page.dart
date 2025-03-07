@@ -1,8 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_form_builder/flutter_form_builder.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:form_builder_validators/form_builder_validators.dart';
 import 'package:haven_net/features/voice_recognition/view/voice_recognition_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -14,11 +17,18 @@ class _LoginPageState extends State<LoginPage> {
   final _formKey = GlobalKey<FormBuilderState>();
   bool isLoading = false;
 
+  Future<void> setEmailAndPassword(String email, String password, String userType) async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setString('login_email', email);
+    await prefs.setString('login_password', password);
+    await prefs.setString('login_user_type', userType);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Login"),
+        title: const Text("Child Login"),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -91,6 +101,8 @@ class _LoginPageState extends State<LoginPage> {
           password: password,
         );
 
+        await setEmailAndPassword(email, password, "child");
+
         // Navigate to Home Page on Successful Login
         Navigator.pushReplacement(
           context,
@@ -98,7 +110,7 @@ class _LoginPageState extends State<LoginPage> {
         );
 
         setState(() {
-          isLoading = true;
+          isLoading = false;
         });
       } 
       
